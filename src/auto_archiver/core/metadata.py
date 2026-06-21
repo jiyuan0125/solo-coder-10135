@@ -75,8 +75,11 @@ class Metadata:
 
     def append(self, key: str, val: Any) -> Metadata:
         if key not in self.metadata:
-            self.metadata[key] = []
-        self.metadata[key] = val
+            self.metadata[key] = [val]
+        elif isinstance(self.metadata[key], list):
+            self.metadata[key].append(val)
+        else:
+            self.metadata[key] = [self.metadata[key], val]
         return self
 
     def get(self, key: str, default: Any = None, create_if_missing=False) -> Union[Metadata, str]:

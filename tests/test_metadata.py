@@ -192,3 +192,32 @@ def test_choose_most_complete_from_pickles(unpickle):
     # Iterates `for r in results[1:]:`
     res = Metadata.choose_most_complete([Metadata(), m_after_enriching, m_before_enriching])
     assert res.media == m_after_enriching.media
+
+
+def test_append_creates_list():
+    m = Metadata()
+    m.append("tags", "tag1")
+    assert m.get("tags") == ["tag1"]
+
+
+def test_append_accumulates_into_list():
+    m = Metadata()
+    m.append("errors", "Error A")
+    m.append("errors", "Error B")
+    m.append("errors", "Error C")
+    assert m.get("errors") == ["Error A", "Error B", "Error C"]
+
+
+def test_append_converts_existing_scalar_to_list():
+    m = Metadata()
+    m.set("tags", "first_tag")
+    m.append("tags", "second_tag")
+    assert m.get("tags") == ["first_tag", "second_tag"]
+
+
+def test_append_after_set_then_append():
+    m = Metadata()
+    m.set("x", "val1")
+    m.append("x", "val2")
+    m.append("x", "val3")
+    assert m.get("x") == ["val1", "val2", "val3"]
