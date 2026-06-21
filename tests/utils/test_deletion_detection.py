@@ -223,7 +223,7 @@ class TestFlagAsDeleted:
         }
         flag_as_deleted(metadata, deletion_info)
         assert metadata.get("deletion_detected") is True
-        assert metadata.get("deletion_indicator") == "This Tweet is unavailable"
+        assert metadata.get("deletion_indicator") == ["This Tweet is unavailable"]
         assert metadata.get("deletion_source") == "html_content"
         assert metadata.get("deletion_platform") == "twitter"
         assert metadata.status == "deleted_or_unavailable"
@@ -238,7 +238,9 @@ class TestFlagAsDeleted:
         }
         flag_as_deleted(metadata, deletion_info)
         assert "deletion_indicator" in metadata.metadata
-        assert "uploader" in metadata.get("deletion_indicator")
+        indicators = metadata.get("deletion_indicator")
+        assert isinstance(indicators, list)
+        assert any("uploader" in ind for ind in indicators)
 
     def test_flag_with_http_status(self):
         metadata = Metadata()
@@ -250,3 +252,53 @@ class TestFlagAsDeleted:
         }
         flag_as_deleted(metadata, deletion_info)
         assert metadata.get("deletion_source") == "http_status"
+
+    def test_multiple_calls_accumulate_indicators(self):
+        metadata = Metadata()
+        info1 = {
+            "is_deleted": True,
+            "indicator": "this post has been removed",
+            "source": "html_content",
+            "platform": "reddit",
+        }
+        info2 = {
+            "is_deleted": True,
+            "indicator": "availability: unavailable",
+            "source": "video_metadata",
+            "platform": "reddit",
+        }
+        flag_as_deleted(metadata, info1)
+        flag_as_deleted(metadata, info2)
+        indicators = metadata.get("deletion_indicator")
+        assert isinstance(indicators, list)
+        assert len(indicators) == 2
+        assert "this post has been removed" in indicators
+        assert "availability: unavailable" in indicators
+
+    def test_first_indicator_not_lost_after_second_call(self):
+        metadata = Metadata()
+        first_info = {
+            "is_deleted": True,
+            "indicator": "Hmm...this page doesn't exist",
+            "source": "page_title",
+            "platform": "twitter",
+        }
+        second_info = {
+            "is_deleted": True,
+            "indicator": "This Tweet has been deleted",
+            "source": "html_content",
+            "platform": "twitter",
+        }
+        flag_as_deleted(metadata, first_info)
+        assert first_info["indicator"] in metadata.get("deletion_indicator")
+        flag_as_deleted(metadata, second_info)
+        assert first_info["indicator"] in metadata.get("deletion_indicator")
+        assert second_info["indicator"] in metadata.get("deletion_indicator")
+
+    def test_source_reflects_most_recent_call(self):
+        metadata = Metadata()
+        info1 = {"indicator": "ind1", "source": "html_content", "platform": "twitter"}
+        info2 = {"indicator": "ind2", "source": "error_message", "platform": "twitter"}
+        flag_as_deleted(metadata, info1)
+        flag_as_deleted(metadata, info2)
+        assert metadata.get("deletion_source") == "error_message"

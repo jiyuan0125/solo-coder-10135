@@ -312,12 +312,16 @@ def flag_as_deleted(metadata, deletion_info: Dict[str, any]) -> None:
     Flags metadata object as deleted/unavailable.
     Adds tentative deletion information to the metadata object.
 
+    Multiple calls accumulate deletion indicators so that no detection
+    clue from any extractor is lost. Other fields (source, platform)
+    reflect the most recent call.
+
     Args:
         metadata: Metadata object to update
         deletion_info: Dictionary from detect_deletion()
     """
     metadata.set("deletion_detected", True)
-    metadata.set("deletion_indicator", deletion_info.get("indicator"))
+    metadata.append("deletion_indicator", deletion_info.get("indicator"))
     metadata.set("deletion_source", deletion_info.get("source"))
     metadata.set("deletion_platform", deletion_info.get("platform"))
     metadata.status = "deleted_or_unavailable"
