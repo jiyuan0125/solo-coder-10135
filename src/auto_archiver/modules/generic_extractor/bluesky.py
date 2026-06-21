@@ -13,7 +13,10 @@ class Bluesky(GenericDropin):
         result.set_timestamp(post["record"]["createdAt"])
         for k, v in self._get_post_data(post).items():
             if v:
-                result.set(k, v)
+                if k in result.metadata:
+                    result.append(k, v)
+                else:
+                    result.set(k, v)
 
         # download if embeds present (1 video XOR >=1 images)
         for media in self._download_bsky_embeds(post, archiver):

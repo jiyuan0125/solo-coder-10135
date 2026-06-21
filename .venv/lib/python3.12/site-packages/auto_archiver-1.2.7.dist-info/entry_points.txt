@@ -1,0 +1,3 @@
+[console_scripts]
+auto-archiver=auto_archiver.__main__:main
+

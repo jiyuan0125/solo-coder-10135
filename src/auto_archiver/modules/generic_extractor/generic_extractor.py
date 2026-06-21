@@ -343,7 +343,10 @@ class GenericExtractor(Extractor):
         # then add the rest of the video data
         for k, v in video_data.items():
             if v:
-                result.set(k, v)
+                if k in result.metadata:
+                    result.append(k, v)
+                else:
+                    result.set(k, v)
 
         return result
 

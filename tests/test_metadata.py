@@ -71,6 +71,24 @@ def test_left_merge():
     assert left.get("stats") == {"views": 10, "likes": 5}
 
 
+def test_merge_scalar_conflict_accumulates():
+    left = Metadata()
+    left.append("tags", "tag1")
+    right = Metadata()
+    right.append("tags", "tag2")
+    left.merge(right, overwrite_left=True)
+    assert left.get("tags") == ["tag1", "tag2"]
+
+
+def test_merge_scalar_into_existing_list():
+    left = Metadata()
+    left.append("errors", "error1")
+    right = Metadata()
+    right.set("errors", "error2")
+    left.merge(right, overwrite_left=True)
+    assert left.get("errors") == ["error1", "error2"]
+
+
 def test_media_management(basic_metadata, media_file):
     media1 = media_file(hash_value="abc")
     media2 = media_file(hash_value="abc")  # Duplicate
@@ -192,3 +210,39 @@ def test_choose_most_complete_from_pickles(unpickle):
     # Iterates `for r in results[1:]:`
     res = Metadata.choose_most_complete([Metadata(), m_after_enriching, m_before_enriching])
     assert res.media == m_after_enriching.media
+
+
+def test_append_single_values():
+    m = Metadata()
+    m.append("errors", "error1")
+    m.append("errors", "error2")
+    assert m.get("errors") == ["error1", "error2"]
+
+
+def test_append_list_values():
+    m = Metadata()
+    m.append("tags", ["tag1", "tag2"])
+    assert m.get("tags") == ["tag1", "tag2"]
+
+
+def test_append_mixed_values():
+    m = Metadata()
+    m.append("items", "first")
+    m.append("items", ["second", "third"])
+    assert m.get("items") == ["first", "second", "third"]
+
+
+def test_append_converts_existing_scalar():
+    m = Metadata()
+    m.set("tags", "tag1")
+    m.append("tags", "tag2")
+    assert m.get("tags") == ["tag1", "tag2"]
+
+
+def test_merge_scalar_over_scalar_overwrites():
+    left = Metadata()
+    left.set("author", "Alice")
+    right = Metadata()
+    right.set("author", "Bob")
+    left.merge(right, overwrite_left=True)
+    assert left.get("author") == "Bob"

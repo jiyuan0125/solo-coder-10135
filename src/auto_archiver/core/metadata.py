@@ -49,14 +49,22 @@ class Metadata:
                 self.status = right.status
             self._context.update(right._context)
             for k, v in right.metadata.items():
-                assert k not in self.metadata or type(v) is type(self.get(k))
-                if not isinstance(v, (dict, list, set)) or k not in self.metadata:
+                if k not in self.metadata:
                     self.set(k, v)
-                else:  # key conflict
-                    if isinstance(v, (dict, set)):
-                        self.set(k, self.get(k) | v)
-                    elif type(v) is list:
-                        self.set(k, self.get(k) + v)
+                else:
+                    existing = self.get(k)
+                    if isinstance(v, dict) and isinstance(existing, dict):
+                        self.set(k, existing | v)
+                    elif isinstance(v, set) and isinstance(existing, set):
+                        self.set(k, existing | v)
+                    elif isinstance(v, list) and isinstance(existing, list):
+                        self.set(k, existing + v)
+                    elif isinstance(existing, list):
+                        self.set(k, existing + ([v] if not isinstance(v, list) else v))
+                    elif isinstance(v, list):
+                        self.set(k, [existing] + v)
+                    else:
+                        self.set(k, v)
             self.media.extend(right.media)
 
         else:  # invert and do same logic
@@ -76,7 +84,12 @@ class Metadata:
     def append(self, key: str, val: Any) -> Metadata:
         if key not in self.metadata:
             self.metadata[key] = []
-        self.metadata[key] = val
+        if not isinstance(self.metadata[key], list):
+            self.metadata[key] = [self.metadata[key]]
+        if isinstance(val, list):
+            self.metadata[key].extend(val)
+        else:
+            self.metadata[key].append(val)
         return self
 
     def get(self, key: str, default: Any = None, create_if_missing=False) -> Union[Metadata, str]:
