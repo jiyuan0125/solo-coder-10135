@@ -34,6 +34,24 @@ class Metadata:
         self.set("_processed_at", datetime.datetime.now(datetime.timezone.utc))
         self._context = {}
 
+    _OVERWRITE_ONLY_KEYS = {
+        "url",
+        "original_url",
+        "replaced_url",
+        "status",
+        "timestamp",
+        "title",
+        "content",
+        "upload_date",
+        "archive_duration_seconds",
+        "total_bytes",
+        "total_size",
+        "deletion_detected",
+        "deletion_indicator",
+        "deletion_source",
+        "deletion_platform",
+    }
+
     def merge(self: Metadata, right: Metadata, overwrite_left=True) -> Metadata:
         """
         Merges another `Metadata` instance into this one.
@@ -41,6 +59,13 @@ class Metadata:
         Conflicts are resolved based on the `overwrite_left` flag:
         - If `True`, this instance's values are overwritten by `right`.
         - If `False`, the inverse applies.
+
+        For matching keys:
+        - Internal keys (starting with '_') and special keys are overwritten.
+        - Dict values are merged using union.
+        - List values are concatenated.
+        - All other values with conflicting keys are accumulated into lists
+          to preserve all writes from multiple extractors.
         """
         if not right:
             return self
@@ -49,14 +74,14 @@ class Metadata:
                 self.status = right.status
             self._context.update(right._context)
             for k, v in right.metadata.items():
-                assert k not in self.metadata or type(v) is type(self.get(k))
-                if not isinstance(v, (dict, list, set)) or k not in self.metadata:
+                if k not in self.metadata:
                     self.set(k, v)
-                else:  # key conflict
-                    if isinstance(v, (dict, set)):
-                        self.set(k, self.get(k) | v)
-                    elif type(v) is list:
-                        self.set(k, self.get(k) + v)
+                elif k.startswith("_") or k in self._OVERWRITE_ONLY_KEYS:
+                    self.set(k, v)
+                elif isinstance(v, dict) and isinstance(self.get(k), dict):
+                    self.set(k, self.get(k) | v)
+                else:
+                    self.append(k, v)
             self.media.extend(right.media)
 
         else:  # invert and do same logic
@@ -76,7 +101,12 @@ class Metadata:
     def append(self, key: str, val: Any) -> Metadata:
         if key not in self.metadata:
             self.metadata[key] = []
-        self.metadata[key] = val
+        if not isinstance(self.metadata[key], list):
+            self.metadata[key] = [self.metadata[key]]
+        if isinstance(val, list):
+            self.metadata[key].extend(val)
+        else:
+            self.metadata[key].append(val)
         return self
 
     def get(self, key: str, default: Any = None, create_if_missing=False) -> Union[Metadata, str]:

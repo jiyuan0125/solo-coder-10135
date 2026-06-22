@@ -89,6 +89,75 @@ class TestDetectDeletion:
 
         assert result is None
 
+    def test_http_status_code_404(self):
+        """Test that HTTP 404 status code triggers deletion detection."""
+        result = detect_deletion(http_status_code=404, url="https://example.com/page")
+
+        assert result is not None
+        assert result["is_deleted"] is True
+        assert result["source"] == "http_status"
+        assert "404" in result["indicator"]
+
+    def test_http_status_code_410(self):
+        """Test that HTTP 410 (Gone) status code triggers deletion detection."""
+        result = detect_deletion(http_status_code=410, url="https://example.com/page")
+
+        assert result is not None
+        assert result["is_deleted"] is True
+        assert result["source"] == "http_status"
+        assert "410" in result["indicator"]
+
+    def test_http_status_code_451(self):
+        """Test that HTTP 451 (Unavailable For Legal Reasons) triggers deletion detection."""
+        result = detect_deletion(http_status_code=451, url="https://example.com/page")
+
+        assert result is not None
+        assert result["is_deleted"] is True
+        assert result["source"] == "http_status"
+        assert "451" in result["indicator"]
+
+    def test_normal_http_status_codes_not_detected(self):
+        """Test that normal HTTP status codes (200, 301, 302, 403) do NOT trigger deletion."""
+        for status_code in [200, 201, 301, 302, 400, 401, 403, 500]:
+            result = detect_deletion(http_status_code=status_code, url="https://example.com/page")
+            assert result is None, f"HTTP {status_code} should not trigger deletion detection"
+
+    def test_normal_page_with_sidebar_removed_text(self):
+        """Test that a normal Reddit page with 'removed' in sidebar is NOT flagged as deleted."""
+        html = """
+        <html>
+        <body>
+            <div class='main-content'>
+                <h1>My Reddit Post</h1>
+                <p>This is a normal, active post with lots of content.</p>
+                <div class='comment'>Great post!</div>
+                <div class='comment'>I agree!</div>
+            </div>
+            <div class='sidebar'>
+                <a href='/removed'>View removed posts</a>
+                <p>page not found</p>
+            </div>
+            <footer>
+                <a href='/help/deleted'>How to delete posts</a>
+            </footer>
+        </body>
+        </html>
+        """
+        title = "My Reddit Post - r/test"
+        url = "https://reddit.com/r/test/comments/abc123/my_reddit_post"
+
+        result = detect_deletion(html_content=html, page_title=title, url=url)
+
+        assert result is None, "Normal page with 'removed' in sidebar/footer should not be flagged"
+
+    def test_http_status_takes_priority_over_html(self):
+        """Test that HTTP status code is checked before HTML content."""
+        html = "<html><body>Hmm...this page doesn't exist</body></html>"
+        result = detect_deletion(html_content=html, http_status_code=404, url="https://twitter.com/user/status/123")
+
+        assert result is not None
+        assert result["source"] == "http_status", "HTTP status should take priority over HTML content"
+
     def test_instagram_media_not_found(self):
         """Test Instagram-specific deletion message."""
         error = "Media not found or unavailable"
@@ -101,14 +170,28 @@ class TestDetectDeletion:
         assert "not found" in result["indicator"].lower()
 
     def test_reddit_removed_content(self):
-        """Test Reddit [removed] and [deleted] markers."""
-        html = "<div class='comment'>[removed]</div>"
+        """Test Reddit removed content detection with specific long phrases."""
+        html = "<div class='removed-by'>this post has been removed by the moderators of r/test</div>"
         url = "https://reddit.com/r/test/comments/abc123"
 
         result = detect_deletion(html_content=html, url=url)
 
         assert result is not None
         assert result["platform"] == "reddit"
+        assert "removed" in result["indicator"].lower()
+
+    def test_reddit_short_markers_not_detected(self):
+        """Verify that short [removed] and [deleted] markers are NOT detected (to avoid false positives)."""
+        html = """
+        <div class='comment'>[removed]</div>
+        <div class='comment'>[deleted]</div>
+        <div class='sidebar'>View removed posts</div>
+        """
+        url = "https://reddit.com/r/test/comments/abc123"
+
+        result = detect_deletion(html_content=html, url=url)
+
+        assert result is None, "Short [removed]/[deleted] markers should not trigger deletion detection"
 
 
 class TestFlagAsDeleted:

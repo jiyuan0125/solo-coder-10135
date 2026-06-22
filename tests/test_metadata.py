@@ -71,6 +71,44 @@ def test_left_merge():
     assert left.get("stats") == {"views": 10, "likes": 5}
 
 
+def test_merge_string_values_accumulate_to_list():
+    """Test that multiple writes to the same non-special key accumulate into a list."""
+    left = Metadata().set("tags", "news").set("author", "user1")
+    right = Metadata().set("tags", "politics").set("author", "user2")
+
+    left.merge(right)
+    assert left.get("tags") == ["news", "politics"]
+    assert left.get("author") == ["user1", "user2"]
+
+
+def test_merge_mixed_types_accumulate():
+    """Test that merging a non-list value with a list value works correctly."""
+    left = Metadata().set("tags", ["news", "sports"])
+    right = Metadata().set("tags", "politics")
+
+    left.merge(right)
+    assert left.get("tags") == ["news", "sports", "politics"]
+
+
+def test_append_method_correctly_adds_to_list():
+    """Test that the append() method correctly adds values to a list."""
+    m = Metadata()
+    m.append("tags", "tag1")
+    m.append("tags", "tag2")
+    m.append("tags", ["tag3", "tag4"])
+
+    assert m.get("tags") == ["tag1", "tag2", "tag3", "tag4"]
+
+
+def test_append_converts_existing_value_to_list():
+    """Test that append() converts an existing non-list value to a list before appending."""
+    m = Metadata()
+    m.set("category", "news")
+    m.append("category", "sports")
+
+    assert m.get("category") == ["news", "sports"]
+
+
 def test_media_management(basic_metadata, media_file):
     media1 = media_file(hash_value="abc")
     media2 = media_file(hash_value="abc")  # Duplicate
